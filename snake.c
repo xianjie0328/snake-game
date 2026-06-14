@@ -3,143 +3,83 @@
 #include <conio.h>
 #include <windows.h>
 
-#define WIDTH 20
-#define HEIGHT 20
+#define W 20
+#define H 20
 
-int x, y, foodX, foodY, score, gameOver;
-int tailX[100], tailY[100];
-int nTail;
-enum eDirection { STOP = 0, LEFT, RIGHT, UP, DOWN };
-enum eDirection dir;
+int px, py, fx, fy, sc, over;
+int tx[100], ty[100];
+int tl;
+enum D { S = 0, L, R, U, Dn };
+enum D d;
 
-void Setup() {
-    gameOver = 0;
-    dir = STOP;
-    x = WIDTH / 2;
-    y = HEIGHT / 2;
-    foodX = rand() % WIDTH;
-    foodY = rand() % HEIGHT;
-    score = 0;
-    nTail = 0;
+void init() {
+    over = 0;
+    d = S;
+    px = W / 2;
+    py = H / 2;
+    fx = rand() % W;
+    fy = rand() % H;
+    sc = 0;
+    tl = 0;
 }
 
-void Draw() {
+void render() {
     system("cls");
-    printf("Score: %d\n", score);
-    for (int i = 0; i < WIDTH + 2; i++)
-        printf("#");
+    printf("SCORE: %d\n", sc);
+    for (int i = 0; i < W + 2; i++) printf("+");
     printf("\n");
-
-    for (int i = 0; i < HEIGHT; i++) {
-        for (int j = 0; j < WIDTH; j++) {
-            if (j == 0)
-                printf("#");
-            if (i == y && j == x)
-                printf("O");
-            else if (i == foodY && j == foodX)
-                printf("*");
-            else {
-                int print = 0;
-                for (int k = 0; k < nTail; k++) {
-                    if (tailX[k] == j && tailY[k] == i) {
-                        printf("o");
-                        print = 1;
-                    }
-                }
-                if (!print)
-                    printf(" ");
-            }
-            if (j == WIDTH - 1)
-                printf("#");
+    for (int i = 0; i < H; i++) {
+        printf("+");
+        for (int j = 0; j < W; j++) {
+            if (i == py && j == px) printf("@");
+            else if (i == fy && j == fx) printf("$");
+            else printf(" ");
         }
-        printf("\n");
+        printf("+\n");
     }
-
-    for (int i = 0; i < WIDTH + 2; i++)
-        printf("#");
+    for (int i = 0; i < W + 2; i++) printf("+");
     printf("\n");
 }
 
-void Input() {
+void ctrl() {
     if (_kbhit()) {
-        switch (_getch()) {
-        case 'a':
-            if (dir != RIGHT) dir = LEFT;
-            break;
-        case 'd':
-            if (dir != LEFT) dir = RIGHT;
-            break;
-        case 'w':
-            if (dir != DOWN) dir = UP;
-            break;
-        case 's':
-            if (dir != UP) dir = DOWN;
-            break;
-        case 'x':
-            gameOver = 1;
-            break;
-        }
+        char c = _getch();
+        if (c == 'a') d = L;
+        if (c == 'd') d = R;
+        if (c == 'w') d = U;
+        if (c == 's') d = Dn;
     }
 }
 
-void Logic() {
-    int prevX = tailX[0];
-    int prevY = tailY[0];
-    int prev2X, prev2Y;
-    tailX[0] = x;
-    tailY[0] = y;
-    for (int i = 1; i < nTail; i++) {
-        prev2X = tailX[i];
-        prev2Y = tailY[i];
-        tailX[i] = prevX;
-        tailY[i] = prevY;
-        prevX = prev2X;
-        prevY = prev2Y;
+void update() {
+    tx[0] = px;
+    ty[0] = py;
+    for (int i = tl; i > 0; i--) {
+        tx[i] = tx[i-1];
+        ty[i] = ty[i-1];
     }
-
-    switch (dir) {
-    case LEFT:
-        x--;
-        break;
-    case RIGHT:
-        x++;
-        break;
-    case UP:
-        y--;
-        break;
-    case DOWN:
-        y++;
-        break;
-    default:
-        break;
-    }
-
-    if (x >= WIDTH) x = 0; else if (x < 0) x = WIDTH - 1;
-    if (y >= HEIGHT) y = 0; else if (y < 0) y = HEIGHT - 1;
-
-    for (int i = 0; i < nTail; i++) {
-        if (tailX[i] == x && tailY[i] == y)
-            gameOver = 1;
-    }
-
-    if (x == foodX && y == foodY) {
-        score += 10;
-        foodX = rand() % WIDTH;
-        foodY = rand() % HEIGHT;
-        nTail++;
+    if (d == L) px--;
+    if (d == R) px++;
+    if (d == U) py--;
+    if (d == Dn) py++;
+    if (px < 0 || px >= W || py < 0 || py >= H) over = 1;
+    if (px == fx && py == fy) {
+        sc += 5;
+        fx = rand() % W;
+        fy = rand() % H;
+        tl++;
     }
 }
 
 int main() {
-    Setup();
-    while (!gameOver) {
-        Draw();
-        Input();
-        Logic();
-        Sleep(100);
+    init();
+    while (!over) {
+        render();
+        ctrl();
+        update();
+        Sleep(80);
     }
-    printf("Game Over! Final Score: %d\n", score);
-    printf("Press any key to exit...\n");
+    printf("END: %d\n", sc);
     getch();
     return 0;
 }
