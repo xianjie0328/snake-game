@@ -3,221 +3,160 @@
 #include <conio.h>
 #include <windows.h>
 
-#define MAP_WIDTH 25
-#define MAP_HEIGHT 20
+#define COLS 30
+#define ROWS 15
 
-int snakeHeadX, snakeHeadY, fruitX, fruitY, currentScore, isGameOver, highestScore;
-int snakeTailX[200], snakeTailY[200];
-int tailLength;
-int gameSpeed = 120;
-int isPaused = 0;
-enum Direction { STOPPED = 0, MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN };
-enum Direction currentDirection;
-HANDLE consoleHandle;
+int headX, headY, foodX, foodY, badX, badY, points, over, length;
+int bodyX[300], bodyY[300];
+enum Move { HALT = 0, GO_LEFT, GO_RIGHT, GO_UP, GO_DOWN };
+enum Move way;
 
-void setConsoleColor(int color) {
-    SetConsoleTextAttribute(consoleHandle, color);
+void spawnItems() {
+    foodX = rand() % COLS;
+    foodY = rand() % ROWS;
+    badX = rand() % COLS;
+    badY = rand() % ROWS;
 }
 
-void resetConsoleColor() {
-    SetConsoleTextAttribute(consoleHandle, 7);
+void begin() {
+    over = 0;
+    way = HALT;
+    headX = COLS / 2;
+    headY = ROWS / 2;
+    points = 0;
+    length = 0;
+    spawnItems();
 }
 
-void loadHighestScore() {
-    FILE *file = fopen("score.dat", "r");
-    if (file) {
-        fscanf(file, "%d", &highestScore);
-        fclose(file);
-    } else {
-        highestScore = 0;
-    }
-}
-
-void saveHighestScore() {
-    FILE *file = fopen("score.dat", "w");
-    if (file) {
-        fprintf(file, "%d", highestScore);
-        fclose(file);
-    }
-}
-
-void initializeGame() {
-    consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-    isGameOver = 0;
-    isPaused = 0;
-    currentDirection = STOPPED;
-    snakeHeadX = MAP_WIDTH / 2;
-    snakeHeadY = MAP_HEIGHT / 2;
-    fruitX = rand() % MAP_WIDTH;
-    fruitY = rand() % MAP_HEIGHT;
-    currentScore = 0;
-    tailLength = 0;
-    gameSpeed = 120;
-    loadHighestScore();
-}
-
-void drawGameBoard() {
-    COORD cursorPosition = {0, 0};
-    SetConsoleCursorPosition(consoleHandle, cursorPosition);
-
-    setConsoleColor(11);
-    printf("Score: %d  |  High Score: %d  |  Speed: %d\n", currentScore, highestScore, 130 - gameSpeed);
-    resetConsoleColor();
-
-    setConsoleColor(8);
-    for (int i = 0; i < MAP_WIDTH + 2; i++) printf("#");
+void show() {
+    system("cls");
+    printf("Points: %d   Length: %d\n", points, length);
+    for (int i = 0; i < COLS + 2; i++) printf("=");
     printf("\n");
-    resetConsoleColor();
 
-    for (int i = 0; i < MAP_HEIGHT; i++) {
-        setConsoleColor(8);
-        printf("#");
-        resetConsoleColor();
-
-        for (int j = 0; j < MAP_WIDTH; j++) {
-            if (i == snakeHeadY && j == snakeHeadX) {
-                setConsoleColor(10);
-                printf("O");
-                resetConsoleColor();
-            } else if (i == fruitY && j == fruitX) {
-                setConsoleColor(12);
-                printf("*");
-                resetConsoleColor();
+    for (int i = 0; i < ROWS; i++) {
+        printf("|");
+        for (int j = 0; j < COLS; j++) {
+            if (i == headY && j == headX) {
+                printf("@");
+            } else if (i == foodY && j == foodX) {
+                printf("+");
+            } else if (i == badY && j == badX) {
+                printf("X");
             } else {
-                int drawn = 0;
-                for (int k = 0; k < tailLength; k++) {
-                    if (snakeTailX[k] == j && snakeTailY[k] == i) {
-                        setConsoleColor(14);
-                        printf("o");
-                        resetConsoleColor();
-                        drawn = 1;
+                int ok = 0;
+                for (int k = 0; k < length; k++) {
+                    if (bodyX[k] == j && bodyY[k] == i) {
+                        printf("*");
+                        ok = 1;
                         break;
                     }
                 }
-                if (!drawn) printf(" ");
+                if (!ok) printf(" ");
             }
         }
-
-        setConsoleColor(8);
-        printf("#\n");
-        resetConsoleColor();
+        printf("|\n");
     }
 
-    setConsoleColor(8);
-    for (int i = 0; i < MAP_WIDTH + 2; i++) printf("#");
+    for (int i = 0; i < COLS + 2; i++) printf("=");
     printf("\n");
-    resetConsoleColor();
-
-    if (isPaused) {
-        setConsoleColor(13);
-        printf("[PAUSED] Press P to resume\n");
-        resetConsoleColor();
-    } else {
-        printf("W/A/S/D: Move | P: Pause | X: Quit\n");
-    }
+    printf("Controls: I/J/K/L | Poison: X | Quit: Q\n");
 }
 
-void handleInput() {
+void command() {
     if (_kbhit()) {
-        char key = _getch();
-        switch (key) {
-            case 'a':
-                if (currentDirection != MOVE_RIGHT) currentDirection = MOVE_LEFT;
-                break;
-            case 'd':
-                if (currentDirection != MOVE_LEFT) currentDirection = MOVE_RIGHT;
-                break;
-            case 'w':
-                if (currentDirection != MOVE_DOWN) currentDirection = MOVE_UP;
-                break;
-            case 's':
-                if (currentDirection != MOVE_UP) currentDirection = MOVE_DOWN;
-                break;
-            case 'p':
-            case 'P':
-                isPaused = !isPaused;
-                break;
-            case 'x':
-            case 'X':
-                isGameOver = 1;
-                break;
+        char ch = _getch();
+        switch (ch) {
+            case 'j': if (way != GO_RIGHT) way = GO_LEFT; break;
+            case 'l': if (way != GO_LEFT) way = GO_RIGHT; break;
+            case 'i': if (way != GO_DOWN) way = GO_UP; break;
+            case 'k': if (way != GO_UP) way = GO_DOWN; break;
+            case 'q': over = 1; break;
         }
     }
 }
 
-void updateGameLogic() {
-    if (isPaused) return;
-
-    int prevX = snakeTailX[0];
-    int prevY = snakeTailY[0];
-    int tempX, tempY;
-    snakeTailX[0] = snakeHeadX;
-    snakeTailY[0] = snakeHeadY;
-
-    for (int i = 1; i < tailLength; i++) {
-        tempX = snakeTailX[i];
-        tempY = snakeTailY[i];
-        snakeTailX[i] = prevX;
-        snakeTailY[i] = prevY;
-        prevX = tempX;
-        prevY = tempY;
+void tick() {
+    int oldX = bodyX[0];
+    int oldY = bodyY[0];
+    int swapX, swapY;
+    bodyX[0] = headX;
+    bodyY[0] = headY;
+    for (int i = 1; i < length; i++) {
+        swapX = bodyX[i];
+        swapY = bodyY[i];
+        bodyX[i] = oldX;
+        bodyY[i] = oldY;
+        oldX = swapX;
+        oldY = swapY;
     }
 
-    switch (currentDirection) {
-        case MOVE_LEFT:  snakeHeadX--; break;
-        case MOVE_RIGHT: snakeHeadX++; break;
-        case MOVE_UP:    snakeHeadY--; break;
-        case MOVE_DOWN:  snakeHeadY++; break;
-        default: break;
-    }
+    if (way == GO_LEFT) headX--;
+    if (way == GO_RIGHT) headX++;
+    if (way == GO_UP) headY--;
+    if (way == GO_DOWN) headY++;
 
-    if (snakeHeadX >= MAP_WIDTH) snakeHeadX = 0;
-    else if (snakeHeadX < 0) snakeHeadX = MAP_WIDTH - 1;
-    if (snakeHeadY >= MAP_HEIGHT) snakeHeadY = 0;
-    else if (snakeHeadY < 0) snakeHeadY = MAP_HEIGHT - 1;
+    if (headX < 0) headX = COLS - 1;
+    if (headX >= COLS) headX = 0;
+    if (headY < 0) headY = ROWS - 1;
+    if (headY >= ROWS) headY = 0;
 
-    for (int i = 0; i < tailLength; i++) {
-        if (snakeTailX[i] == snakeHeadX && snakeTailY[i] == snakeHeadY) {
-            isGameOver = 1;
+    for (int i = 0; i < length; i++) {
+        if (bodyX[i] == headX && bodyY[i] == headY) {
+            over = 1;
+            return;
         }
     }
 
-    if (snakeHeadX == fruitX && snakeHeadY == fruitY) {
-        currentScore += 10;
-        if (currentScore > highestScore) {
-            highestScore = currentScore;
-            saveHighestScore();
+    if (headX == foodX && headY == foodY) {
+        points += 10;
+        length++;
+        foodX = rand() % COLS;
+        foodY = rand() % ROWS;
+        if (rand() % 3 == 0) {
+            badX = rand() % COLS;
+            badY = rand() % ROWS;
         }
-        fruitX = rand() % MAP_WIDTH;
-        fruitY = rand() % MAP_HEIGHT;
-        tailLength++;
-        if (gameSpeed > 40 && currentScore % 50 == 0) {
-            gameSpeed -= 10;
-        }
+    }
+
+    if (headX == badX && headY == badY) {
+        over = 1;
     }
 }
 
-void showGameOverScreen() {
+void countdown() {
+    for (int i = 3; i > 0; i--) {
+        system("cls");
+        printf("\n\n      Starting in %d...\n", i);
+        Sleep(500);
+    }
     system("cls");
-    setConsoleColor(12);
-    printf("=========================\n");
-    printf("       GAME OVER         \n");
-    printf("=========================\n");
-    resetConsoleColor();
-    printf("Final Score: %d\n", currentScore);
-    printf("High Score:  %d\n", highestScore);
-    printf("\nPress any key to exit...\n");
+    printf("\n\n         GO!\n");
+    Sleep(300);
+}
+
+void finish() {
+    system("cls");
+    printf("\n*** GAME OVER ***\n");
+    printf("Points: %d\n", points);
+    printf("Length: %d\n", length);
+    if (points >= 100)
+        printf("Great job!\n");
+    else
+        printf("Keep trying!\n");
+    printf("\nPress any key...\n");
     getch();
 }
 
 int main() {
-    initializeGame();
-    while (!isGameOver) {
-        drawGameBoard();
-        handleInput();
-        updateGameLogic();
-        Sleep(gameSpeed);
+    begin();
+    countdown();
+    while (!over) {
+        show();
+        command();
+        tick();
+        Sleep(90);
     }
-    showGameOverScreen();
+    finish();
     return 0;
 }
