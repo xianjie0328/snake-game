@@ -139,5 +139,7 @@ int main() {
         Sleep(100);
     }
     printf("Game Over! Final Score: %d\n", score);
+    printf("Press any key to exit...\n");
+    getch();
     return 0;
 }
